@@ -2,10 +2,11 @@
   "name": "catch-the-ball-game",
   "version": "1.0.0",
   "description": "A simple ball catching game",
+  "main": "server.js",
   "scripts": {
-    "start": "serve -s"
+    "start": "node server.js"
   },
   "dependencies": {
-    "serve": "^14.2.0"
+    "express": "^4.18.2"
   }
 }
