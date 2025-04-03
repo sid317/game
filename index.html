@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Catch the Ball Game</title>
     <style>
         body {
@@ -11,37 +11,40 @@
             overflow: hidden;
             background-color: #222;
             font-family: Arial, sans-serif;
+            touch-action: manipulation; /* Disable pinch zoom */
         }
         
         #game-container {
             position: relative;
-            width: 800px;
-            height: 600px;
-            margin: 20px auto;
+            width: 100vw;
+            height: 100vh;
+            margin: 0 auto;
             background-color: #111;
-            border: 4px solid #444;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
         }
         
         #paddle {
             position: absolute;
-            width: 150px; /* Wider paddle to match larger balls */
-            height: 25px;
+            width: 30vw; /* Responsive width */
+            height: 4vh;
             background-color: #4CAF50;
             border-radius: 12px;
             bottom: 20px;
-            left: 325px;
+            left: 50%;
+            transform: translateX(-50%);
             box-shadow: 0 0 10px rgba(76, 175, 80, 0.7);
+            touch-action: none; /* Allow touch events */
         }
         
         .ball {
             position: absolute;
-            width: 220px; /* More than twice the original size (was 30px) */
-            height: 220px;
+            width: 15vw; /* Responsive size */
+            height: 15vw;
             background-image: url('https://i.postimg.cc/xjR3M6dW/image-removebg-preview.png');
             background-size: contain;
             background-repeat: no-repeat;
             background-position: center;
+            touch-action: none;
         }
         
         #score-display {
@@ -49,7 +52,8 @@
             top: 10px;
             right: 20px;
             color: white;
-            font-size: 24px;
+            font-size: 5vw;
+            z-index: 100;
         }
         
         #start-screen {
@@ -64,21 +68,21 @@
             justify-content: center;
             align-items: center;
             color: white;
+            z-index: 200;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
         }
         
         #start-button {
             padding: 15px 30px;
-            font-size: 20px;
+            font-size: 5vw;
             background-color: #4CAF50;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
             margin-top: 20px;
-        }
-        
-        #start-button:hover {
-            background-color: #45a049;
         }
         
         #game-over {
@@ -93,21 +97,35 @@
             justify-content: center;
             align-items: center;
             color: white;
+            z-index: 200;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
         }
         
-        #restart-button {
-            padding: 15px 30px;
-            font-size: 20px;
-            background-color: #4CAF50;
+        /* Mobile-specific controls */
+        #touch-controls {
+            position: absolute;
+            bottom: 80px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 50;
+        }
+        
+        .touch-button {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(76, 175, 80, 0.5);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-        
-        #restart-button:hover {
-            background-color: #45a049;
+            font-size: 24px;
+            user-select: none;
         }
     </style>
 </head>
@@ -116,9 +134,15 @@
         <div id="paddle"></div>
         <div id="score-display">Score: 0</div>
         
+        <!-- Mobile touch controls -->
+        <div id="touch-controls">
+            <div class="touch-button" id="left-button">←</div>
+            <div class="touch-button" id="right-button">→</div>
+        </div>
+        
         <div id="start-screen">
             <h1>Catch the Ball</h1>
-            <p>Use your mouse or arrow keys to move the paddle</p>
+            <p>Use touch controls or tilt your device to move the paddle</p>
             <p>Catch the falling balls to score points</p>
             <button id="start-button">Start Game</button>
         </div>
@@ -140,50 +164,71 @@
         const gameOverScreen = document.getElementById('game-over');
         const finalScoreDisplay = document.getElementById('final-score');
         const restartButton = document.getElementById('restart-button');
+        const leftButton = document.getElementById('left-button');
+        const rightButton = document.getElementById('right-button');
         
         let score = 0;
         let gameRunning = false;
         let balls = [];
-        let paddleX = 325; // Adjusted for wider paddle
-        let gameWidth = 800;
-        let gameHeight = 600;
-        let paddleWidth = 150; // Wider paddle
+        let paddleX = 0;
+        let gameWidth = window.innerWidth;
+        let gameHeight = window.innerHeight;
+        let paddleWidth = paddle.offsetWidth;
         let animationId;
         let ballSpeed = 3;
-        let ballSpawnRate = 90; // Increased spawn rate for larger balls
+        let ballSpawnRate = 90;
         let frameCount = 0;
-        const ballSize = 90; // Matching the CSS size
+        let isLeftPressed = false;
+        let isRightPressed = false;
+        let lastTouchX = null;
+        
+        // Initialize game dimensions
+        function initGameDimensions() {
+            gameWidth = window.innerWidth;
+            gameHeight = window.innerHeight;
+            paddleWidth = paddle.offsetWidth;
+            paddleX = (gameWidth - paddleWidth) / 2;
+            paddle.style.left = paddleX + 'px';
+        }
         
         // Event listeners
         startButton.addEventListener('click', startGame);
         restartButton.addEventListener('click', startGame);
         
-        // Mouse movement control
-        gameContainer.addEventListener('mousemove', (e) => {
-            if (!gameRunning) return;
-            
-            const rect = gameContainer.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left - paddleWidth / 2;
-            
-            // Keep paddle within game container
-            paddleX = Math.max(0, Math.min(gameWidth - paddleWidth, mouseX));
-            paddle.style.left = paddleX + 'px';
-        });
+        // Touch controls for paddle
+        gameContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+        gameContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
         
-        // Keyboard controls
-        document.addEventListener('keydown', (e) => {
+        // Touch buttons for mobile
+        leftButton.addEventListener('touchstart', () => { isLeftPressed = true; });
+        leftButton.addEventListener('touchend', () => { isLeftPressed = false; });
+        rightButton.addEventListener('touchstart', () => { isRightPressed = true; });
+        rightButton.addEventListener('touchend', () => { isRightPressed = false; });
+        
+        // Handle window resize
+        window.addEventListener('resize', initGameDimensions);
+        
+        // Handle touch start
+        function handleTouchStart(e) {
             if (!gameRunning) return;
+            e.preventDefault();
+            lastTouchX = e.touches[0].clientX;
+        }
+        
+        // Handle touch move
+        function handleTouchMove(e) {
+            if (!gameRunning || !lastTouchX) return;
+            e.preventDefault();
             
-            const moveAmount = 25; // Increased movement for wider paddle
+            const touchX = e.touches[0].clientX;
+            const deltaX = touchX - lastTouchX;
             
-            if (e.key === 'ArrowLeft') {
-                paddleX = Math.max(0, paddleX - moveAmount);
-            } else if (e.key === 'ArrowRight') {
-                paddleX = Math.min(gameWidth - paddleWidth, paddleX + moveAmount);
-            }
-            
+            paddleX += deltaX;
+            paddleX = Math.max(0, Math.min(gameWidth - paddleWidth, paddleX));
             paddle.style.left = paddleX + 'px';
-        });
+            
+            lastTouchX = touchX;
+        }
         
         // Start game function
         function startGame() {
@@ -204,9 +249,8 @@
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
             
-            // Center paddle
-            paddleX = (gameWidth - paddleWidth) / 2;
-            paddle.style.left = paddleX + 'px';
+            // Initialize game dimensions
+            initGameDimensions();
             
             // Start game loop
             gameRunning = true;
@@ -227,7 +271,7 @@
             ball.className = 'ball';
             
             // Random x position at top
-            const x = Math.random() * (gameWidth - ballSize);
+            const x = Math.random() * (gameWidth - ball.offsetWidth);
             ball.style.left = x + 'px';
             ball.style.top = '0px';
             
@@ -237,7 +281,9 @@
                 element: ball,
                 x: x,
                 y: 0,
-                speed: ballSpeed + Math.random() * 2
+                speed: ballSpeed + Math.random() * 2,
+                width: ball.offsetWidth,
+                height: ball.offsetHeight
             });
         }
         
@@ -260,12 +306,21 @@
             
             frameCount++;
             
+            // Handle button presses
+            if (isLeftPressed) {
+                paddleX = Math.max(0, paddleX - 15);
+            }
+            if (isRightPressed) {
+                paddleX = Math.min(gameWidth - paddleWidth, paddleX + 15);
+            }
+            paddle.style.left = paddleX + 'px';
+            
             // Spawn new balls
             if (frameCount % ballSpawnRate === 0) {
                 createBall();
                 
                 // Increase difficulty
-                if (score > 0 && score % 5 === 0) { // More frequent difficulty increases
+                if (score > 0 && score % 5 === 0) {
                     ballSpeed += 0.5;
                     ballSpawnRate = Math.max(40, ballSpawnRate - 5);
                 }
@@ -278,7 +333,7 @@
                 ball.element.style.top = ball.y + 'px';
                 
                 // Check if ball hit the paddle
-                if (ball.y + ballSize >= gameHeight - 45) { // Adjusted for larger ball and paddle
+                if (ball.y + ball.height >= gameHeight - paddle.offsetHeight - 20) {
                     if (checkCollision(ball)) {
                         // Ball caught - increase score
                         score++;
@@ -301,6 +356,9 @@
             
             animationId = requestAnimationFrame(gameLoop);
         }
+        
+        // Initialize game on load
+        window.addEventListener('load', initGameDimensions);
     </script>
 </body>
 </html>
