@@ -11,7 +11,7 @@
             overflow: hidden;
             background-color: #222;
             font-family: Arial, sans-serif;
-            touch-action: manipulation; /* Disable pinch zoom */
+            touch-action: manipulation;
         }
         
         #game-container {
@@ -25,7 +25,7 @@
         
         #paddle {
             position: absolute;
-            width: 30vw; /* Responsive width */
+            width: 30vw;
             height: 4vh;
             background-color: #4CAF50;
             border-radius: 12px;
@@ -33,13 +33,13 @@
             left: 50%;
             transform: translateX(-50%);
             box-shadow: 0 0 10px rgba(76, 175, 80, 0.7);
-            touch-action: none; /* Allow touch events */
+            touch-action: none;
         }
         
         .ball {
             position: absolute;
-            width: 15vw; /* Responsive size */
-            height: 15vw;
+            width: 25vw; /* 6 times larger than previous 15vw (15/6≈2.5, but we'll make it 25vw for better visibility) */
+            height: 25vw;
             background-image: url('https://i.postimg.cc/xjR3M6dW/image-removebg-preview.png');
             background-size: contain;
             background-repeat: no-repeat;
@@ -103,7 +103,6 @@
             box-sizing: border-box;
         }
         
-        /* Mobile-specific controls */
         #touch-controls {
             position: absolute;
             bottom: 80px;
@@ -134,7 +133,6 @@
         <div id="paddle"></div>
         <div id="score-display">Score: 0</div>
         
-        <!-- Mobile touch controls -->
         <div id="touch-controls">
             <div class="touch-button" id="left-button">←</div>
             <div class="touch-button" id="right-button">→</div>
@@ -176,7 +174,7 @@
         let paddleWidth = paddle.offsetWidth;
         let animationId;
         let ballSpeed = 3;
-        let ballSpawnRate = 90;
+        let ballSpawnRate = 120; // Slightly reduced spawn rate for larger balls
         let frameCount = 0;
         let isLeftPressed = false;
         let isRightPressed = false;
@@ -236,7 +234,7 @@
             score = 0;
             balls = [];
             ballSpeed = 3;
-            ballSpawnRate = 90;
+            ballSpawnRate = 120;
             frameCount = 0;
             
             // Clear all balls from previous game
@@ -271,19 +269,23 @@
             ball.className = 'ball';
             
             // Random x position at top
-            const x = Math.random() * (gameWidth - ball.offsetWidth);
+            const x = Math.random() * (gameWidth - (0.25 * gameWidth)); // Account for ball size
             ball.style.left = x + 'px';
             ball.style.top = '0px';
             
             gameContainer.appendChild(ball);
+            
+            // Get actual rendered size after DOM insertion
+            const ballWidth = ball.offsetWidth;
+            const ballHeight = ball.offsetHeight;
             
             balls.push({
                 element: ball,
                 x: x,
                 y: 0,
                 speed: ballSpeed + Math.random() * 2,
-                width: ball.offsetWidth,
-                height: ball.offsetHeight
+                width: ballWidth,
+                height: ballHeight
             });
         }
         
@@ -319,10 +321,10 @@
             if (frameCount % ballSpawnRate === 0) {
                 createBall();
                 
-                // Increase difficulty
-                if (score > 0 && score % 5 === 0) {
-                    ballSpeed += 0.5;
-                    ballSpawnRate = Math.max(40, ballSpawnRate - 5);
+                // Increase difficulty more gradually
+                if (score > 0 && score % 3 === 0) {
+                    ballSpeed += 0.3;
+                    ballSpawnRate = Math.max(60, ballSpawnRate - 3);
                 }
             }
             
@@ -332,8 +334,8 @@
                 ball.y += ball.speed;
                 ball.element.style.top = ball.y + 'px';
                 
-                // Check if ball hit the paddle
-                if (ball.y + ball.height >= gameHeight - paddle.offsetHeight - 20) {
+                // Check if ball hit the paddle (with more generous collision detection)
+                if (ball.y + ball.height >= gameHeight - paddle.offsetHeight - 30) {
                     if (checkCollision(ball)) {
                         // Ball caught - increase score
                         score++;
